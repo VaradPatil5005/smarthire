@@ -1,8 +1,9 @@
 # SmartHireAI
+SmartHireAI helps a We.PLM delivery manager shortlist bench consultants and external applicants for a PLM project. Each candidate’s score opens to the requirements and reviewed evidence behind it.
 
 Matches a project's requirements to internal bench consultants and external applicants for a
 3DEXPERIENCE consultancy, and shows the evidence behind every score. In our tests, none of the
-18 hidden-text attack pairs moved a score. That is evidence for those attacks, not a guarantee.
+18 hidden-text attack pairs moved a score.
 
 **The idea: evidence-locked scoring.** A candidate earns points only for a passage a person can see on
 the page and a reviewer accepted, or for a form field they confirmed. Hidden text, metadata and
