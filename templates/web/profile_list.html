@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Profiles · SmartHireAI{% endblock %}
+{% block hero %}
+<div class="hero-row">
+  <div><h1>Profiles</h1><p class="hero-sub">{{ page.paginator.count }} {% if q or resource_type %}matching{% else %}in this organisation{% endif %}</p></div>
+  <form method="get" class="hero-actions" role="search">
+    <div class="hero-search">{% icon "search" %}<label class="visually-hidden" for="pq">Search profiles</label><input id="pq" name="q" value="{{ q }}" placeholder="Search name or title"><button class="btn btn-light-pill btn-sm" type="submit">Search</button></div>
+    <label class="visually-hidden" for="pt">Type</label>
+    <select class="form-select w-auto" id="pt" name="resource_type"><option value="">All types</option>{% for value, label in type_choices %}<option value="{{ value }}" {% if resource_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+  </form>
+</div>
+{% endblock %}
+{% block content %}
+<section class="panel" aria-label="Profiles">
+  <ul class="rows">
+    {% for profile in page %}
+    <li class="row-item">
+      <span class="avatar" aria-hidden="true">{{ profile.display_name|initials }}</span>
+      <div class="row-main"><a class="row-title" href="{% url 'profile-detail' profile.pk %}">{{ profile.display_name }}</a><span class="row-sub">{{ profile.title }}</span></div>
+      <div class="row-end">
+        {% if profile.to_review %}<span class="badge badge-provisional">{{ profile.to_review }} to review</span>{% endif %}
+        <span class="badge badge-type">{{ profile.get_resource_type_display }}</span>
+      </div>
+    </li>
+    {% empty %}
+    {% if any_profiles %}<li class="empty-state">No profiles match. Try another name, or clear the filters.</li>{% else %}<li class="empty-state">No profiles yet. Add one below or run an import.</li>{% endif %}
+    {% endfor %}
+  </ul>
+  {% include "web/_pagination.html" %}
+</section>
+<section class="panel" aria-labelledby="add-h">
+  <details class="fold" {% if open_form %}open{% endif %}>
+    <summary><span class="row-icon">{% icon "plus" %}</span><span id="add-h">Add a profile</span>{% icon "chevron" "chev" %}</summary>
+    <div class="fold-body">
+      <form method="post">{% csrf_token %}
+        {% include "web/_profile_fields.html" with profile=None %}
+        {% include "web/_bench_fields.html" with profile=None %}
+        <button class="btn btn-primary mt-3" type="submit">Add profile</button>
+      </form>
+    </div>
+  </details>
+</section>
+{% endblock %}

@@ -1,0 +1,57 @@
+# Secrets and machine-local environment (never committed)
+.env
+.env.*
+!.env.example
+.local-env.sh
+.claude/settings.local.json
+
+# Local assistant instructions, prompts and coordination are not company deliverables.
+# Already-tracked files still need explicit unstaging/untracking before pushing the original repo.
+.claude/
+.codex/
+.agents/
+AGENTS.md
+CLAUDE.md
+prompts/
+coord/
+README-KIT.md
+docs/requirements/
+/docs/source/*Blueprint*.md
+/docs/source/*Build Plan*.md
+/SmartHireAI_15_Day_Internship_Template.docx
+
+# The clean handover is a separate copy, not a nested repository to add here.
+/company-submission/
+
+# Tooling that lives inside the project folder on this machine
+.venv/
+.tools/
+.cache/
+.playwright/
+
+# Originals kept at the folder root; the repo copies are at ./ and docs/source/
+/smarthireai-agent-kit/
+/smarthireai-agent-kit.zip
+/SmartHireAI — *.md
+
+# Python, Django, test output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+db.sqlite3
+*.sqlite*
+*.db
+*.db-*
+*.log
+*.bak
+*.backup
+*.dump
+staticfiles/
+private_media/
+test-results/
+playwright-report/

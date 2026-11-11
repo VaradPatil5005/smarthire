@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Imports · SmartHireAI{% endblock %}
+{% block hero %}
+<div class="hero-row">
+  <div><h1>Imports</h1><p class="hero-sub">Nothing is written until you confirm the preview. Rows match only on source system and ID, never on name, phone or email.</p></div>
+  <div class="hero-actions"><a class="btn btn-ghost" href="{% url 'import-queue' %}">{% icon "inbox" %}Open the import review queue</a></div>
+</div>
+{% endblock %}
+{% block content %}
+<section class="panel" aria-labelledby="up-h"><h2 class="panel-title" id="up-h">Upload a roster</h2>
+  <form method="post" enctype="multipart/form-data" class="row g-2">{% csrf_token %}
+    <div class="col-md-4"><label class="form-label" for="i_source">Source system</label><input class="form-control" id="i_source" name="source_system" required></div>
+    <div class="col-md-5"><label class="form-label" for="i_file">CSV or XLSX, up to 5 MB</label><input class="form-control" id="i_file" type="file" name="file" accept=".csv,.xlsx" required></div>
+    <div class="col-md-3 d-flex align-items-end"><button class="btn btn-primary w-100" type="submit">Preview</button></div>
+  </form>
+</section>
+<section class="panel" aria-labelledby="ba-h"><h2 class="panel-title" id="ba-h">Batches</h2>
+  <ul class="rows">{% for batch in batches %}<li class="row-item"><span class="row-icon">{% icon "import" %}</span><div class="row-main"><a class="row-title" href="{% url 'import-detail' batch.pk %}">{{ batch.source_system }}</a><span class="row-sub">{{ batch.created_at|date:"j M Y H:i" }}</span></div><div class="row-end"><span class="badge badge-type">{{ batch.get_status_display }}</span></div></li>{% empty %}<li class="empty-state">No imports yet.</li>{% endfor %}</ul>
+</section>
+{% endblock %}

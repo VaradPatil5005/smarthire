@@ -1,0 +1,42 @@
+[project]
+name = "smarthireai"
+version = "0.1.0"
+description = "Evidence-locked matching of PLM project requirements to bench consultants and applicants."
+requires-python = ">=3.12,<3.13"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [".tools", ".cache", "smarthireai-agent-kit", "docs/source", "**/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "S", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101", "S105", "S106", "S603", "DJ", "SIM117"]
+"tests/**" = ["S101", "S105", "S106", "S603", "DJ", "SIM117"]
+"conftest.py" = ["S101"]
+"fixtures/**" = ["S101"]
+"config/settings/dev.py" = ["S105"]
+"config/settings/test.py" = ["S105"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.test"
+python_files = ["test_*.py"]
+testpaths = ["apps", "tests"]
+addopts = "--strict-markers"
+markers = [
+  "slow: long-running test, excluded from verify-fast",
+  "e2e: browser end-to-end test, excluded from verify-fast",
+  "adversarial: attack-twin and abuse tests",
+  "isolation: cross-tenant isolation tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["apps"]
+omit = ["*/migrations/*", "*/tests/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true

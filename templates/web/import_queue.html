@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Import review queue · SmartHireAI{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'import-list' %}">All imports</a>
+<h1>Import review queue</h1>
+<p class="hero-sub">These rows have no ID but look like someone we know. A shared phone or a common name is not proof, so a person decides.</p>
+{% endblock %}
+{% block content %}
+<section class="panel"><div class="table-wrap"><table class="table align-middle table-stack"><caption class="visually-hidden">Rows waiting for review</caption><thead><tr><th scope="col">Incoming row</th><th scope="col">Existing profile</th><th scope="col">Why</th><th scope="col">Decision</th></tr></thead>
+<tbody>{% for row in rows %}<tr><td data-label="Incoming row">{{ row.data.display_name }} {{ row.data.email }} {{ row.data.phone }}</td><td data-label="Existing profile">{{ row.candidate_profile.display_name }} {{ row.candidate_profile.email }} {{ row.candidate_profile.phone }}</td><td data-label="Why">{{ row.reason }}</td>
+<td data-label="Decision"><form method="post" action="{% url 'import-queue-resolve' row.pk %}" class="d-flex gap-1 flex-wrap">{% csrf_token %}<button class="btn btn-sm btn-outline-primary" name="action" value="LINK" type="submit">Link to existing</button><button class="btn btn-sm btn-outline-primary" name="action" value="CREATE" type="submit">Create new person</button><button class="btn btn-sm btn-outline-secondary" name="action" value="SKIP" type="submit">Skip</button></form></td></tr>
+{% empty %}<tr><td colspan="4" data-label="" class="empty-state">Nothing is waiting for review.</td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Projects · SmartHireAI{% endblock %}
+{% block hero %}
+<h1>Projects</h1>
+<p class="hero-sub">Set the rubric, lock it, then match bench consultants and applicants against it.</p>
+{% endblock %}
+{% block content %}
+<section class="panel" aria-label="Projects">
+  <ul class="rows">
+    {% for project in projects %}
+    <li class="row-item">
+      <span class="row-icon">{% icon "projects" %}</span>
+      <div class="row-main"><a class="row-title" href="{% url 'project-detail' project.pk %}">{{ project.name }}</a><span class="row-sub">Starts {{ project.start_date|date:"j M Y"|default:"on a date not set" }}</span></div>
+      <div class="row-end"><span class="badge {% if project.status == 'OPEN' %}badge-ready{% else %}badge-type{% endif %}">{{ project.get_status_display }}</span></div>
+    </li>
+    {% empty %}
+    <li class="empty-state">No projects yet. Create the first one below.</li>
+    {% endfor %}
+  </ul>
+</section>
+<section class="panel" aria-labelledby="new-h">
+  <details class="fold">
+    <summary><span class="row-icon">{% icon "plus" %}</span><span id="new-h">New project</span>{% icon "chevron" "chev" %}</summary>
+    <div class="fold-body">
+      <form method="post" class="row g-3">{% csrf_token %}
+        <div class="col-md-6"><label class="form-label" for="p_name">Name</label><input class="form-control" id="p_name" name="name" required></div>
+        <div class="col-md-3"><label class="form-label" for="p_start">Start date</label><input class="form-control" id="p_start" type="date" name="start_date"></div>
+        <div class="col-md-3"><label class="form-label" for="p_alloc">Required allocation %</label><input class="form-control" id="p_alloc" type="number" min="1" max="100" name="required_allocation_pct" value="100"></div>
+        <div class="col-12"><label class="form-label" for="p_desc">Description</label><textarea class="form-control" id="p_desc" name="description" rows="2"></textarea></div>
+        <div class="col-12"><button class="btn btn-primary" type="submit">Create project</button></div>
+      </form>
+    </div>
+  </details>
+</section>
+{% endblock %}

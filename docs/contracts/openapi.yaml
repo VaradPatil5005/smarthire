@@ -1,0 +1,3150 @@
+openapi: 3.0.3
+info:
+  title: SmartHireAI API
+  version: 0.1.0
+  description: 'Evidence-locked project-to-talent matching. This approved contract documents existing
+    views, not planned features. Authenticate through the HTML /login/ form; there is no token-login API.
+    All listed operations require an active Django session and membership. Unsafe requests also require
+    Django CSRF validation (csrfmiddlewaretoken form field or X-CSRFToken header with the token supplied
+    by an HTML form; the CSRF cookie is HttpOnly). No organisation, owner or role provided in a payload
+    grants access: organisation is derived from request.membership. For callers with the required role,
+    cross-organisation object IDs return 404. Session authentication without valid credentials returns
+    403. Scores are stored outputs from Scoring Rule v1.1, not LLM outputs. Decimal score strings must
+    be displayed as returned. Candidate-readable statuses intentionally conceal whether a resume was flagged.
+    Error responses may use detail or field-specific messages.'
+paths:
+  /api/imports/:
+    get:
+      operationId: imports_list
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImportSummary'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List import batches
+      description: 'Permission: ADMIN only. '
+    post:
+      operationId: imports_create
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Preview a synthetic or authorised CSV/XLSX import
+      description: 'Permission: ADMIN only. Dry run; writes no profiles. UTF-8 CSV or XLSX, at most 5
+        MiB and 5000 rows. Recognised ID and name columns are mandatory. Source keys identify records;
+        names/contact fields never auto-merge people.'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                source_system:
+                  type: string
+                  minLength: 1
+              required:
+              - file
+              - source_system
+  /api/imports/{id}/:
+    get:
+      operationId: imports_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read import validation rows and change history
+      description: 'Permission: ADMIN only. '
+  /api/imports/{id}/confirm/:
+    post:
+      operationId: imports_confirm_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportBatch'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Confirm a preview import
+      description: 'Permission: ADMIN only. '
+  /api/imports/{id}/rollback/:
+    post:
+      operationId: imports_rollback_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportRollback'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Roll back a confirmed import
+      description: 'Permission: ADMIN only. Archives created profiles. Reverts a field only while it still
+        equals the imported value; later manual edits are retained.'
+  /api/imports/queue/:
+    get:
+      operationId: imports_queue_retrieve
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ImportQueueRow'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List identity collisions requiring a human choice
+      description: 'Permission: ADMIN only. '
+  /api/imports/queue/{id}/resolve/:
+    post:
+      operationId: imports_queue_resolve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - imports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportQueueResolved'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Resolve one identity-review row
+      description: 'Permission: ADMIN only. Only a confirmed batch with a still-queued row can be resolved.
+        LINK selects an existing profile without merging fields; CREATE creates another person; SKIP makes
+        no profile change.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action:
+                  type: string
+                  enum:
+                  - LINK
+                  - CREATE
+                  - SKIP
+              required:
+              - action
+  /api/profiles/:
+    get:
+      operationId: profiles_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedProfileList'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List active profiles in this organisation
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+    post:
+      operationId: profiles_create
+      tags:
+      - profiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Profile'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Create a profile
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/profiles/{id}/:
+    get:
+      operationId: profiles_retrieve
+      description: 'Permission: Staff; a candidate can read only their own profile. '
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Profile'
+                - $ref: '#/components/schemas/CandidateProfile'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read an accessible profile
+    patch:
+      operationId: profiles_partial_update
+      description: 'Permission: Staff; candidate may edit only own candidate fields. Candidate cannot
+        set type, allocation, available-from, owner, source IDs or organisation.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/PatchedProfile'
+              - $ref: '#/components/schemas/PatchedCandidateProfile'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/Profile'
+                - $ref: '#/components/schemas/CandidateProfile'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Edit an accessible profile
+  /api/profiles/{id}/evidence/:
+    get:
+      operationId: profiles_evidence_retrieve
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EvidenceSpan'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List provisional and reviewed skill evidence
+    post:
+      operationId: profiles_evidence_create
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDecision'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Record a human evidence decision before a run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+  /api/profiles/{id}/resumes/:
+    post:
+      operationId: profiles_resumes_create
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). PDF only; at most 5 MiB
+        and 10 pages. Server assigns private names and quarantines input. Poll /api/resumes/{id}/; a failed
+        replacement preserves earlier versions.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '202':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAccepted'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Upload a new PDF version for scanning
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+  /api/profiles/me/:
+    get:
+      operationId: profiles_me_retrieve
+      description: 'Permission: Any active member; own-profile data only. '
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyProfile'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read my profile and upload status
+    post:
+      operationId: profiles_me_create
+      description: 'Permission: Any active member; own-profile data only. '
+      tags:
+      - profiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidateProfile'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyProfile'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Create my external profile
+    patch:
+      operationId: profiles_me_partial_update
+      description: 'Permission: Any active member; own-profile data only. '
+      tags:
+      - profiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCandidateProfile'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyProfile'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Edit my candidate fields
+  /api/profiles/me/claims/:
+    get:
+      operationId: profiles_me_claims_retrieve
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SkillClaim'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List my structured skill claims
+      description: 'Permission: Any active member; own-profile data only. '
+    post:
+      operationId: profiles_me_claims_create
+      tags:
+      - profiles
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FormClaimInput'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SkillClaim'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Confirm a form skill claim
+      description: 'Permission: Any active member; own-profile data only. Uses a skill name or alias,
+        not its numeric ID. A confirmed form claim is self-reported; this does not accept PDF evidence.'
+  /api/profiles/me/data-requests/:
+    post:
+      operationId: profiles_me_data_requests_create
+      description: 'Permission: Any active member; own-profile data only. Records a request for staff
+        action; it does not delete data.'
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DataRequestCreated'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Record a correction or deletion request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DataRequestInput'
+  /api/profiles/me/resumes/:
+    get:
+      operationId: profiles_me_resumes_retrieve
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CandidateUpload'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List my upload versions
+      description: 'Permission: Any active member; own-profile data only. '
+    post:
+      operationId: profiles_me_resumes_create
+      tags:
+      - profiles
+      security:
+      - cookieAuth: []
+      responses:
+        '202':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadAccepted'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Upload a new PDF version for scanning
+      description: 'Permission: Any active member; own-profile data only. PDF only; at most 5 MiB and
+        10 pages. Server assigns private names and quarantines input. Poll /api/resumes/{id}/; a failed
+        replacement preserves earlier versions.'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+  /api/projects/:
+    get:
+      operationId: projects_list
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List projects
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+    post:
+      operationId: projects_create
+      tags:
+      - projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Project'
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Create a project
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/projects/{id}/:
+    get:
+      operationId: projects_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read a project
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+    patch:
+      operationId: projects_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedProject'
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Edit an open or draft project
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/projects/{id}/close/:
+    post:
+      operationId: projects_close_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Close a project
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/projects/{id}/rubrics/:
+    get:
+      operationId: projects_rubrics_list
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rubric'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List rubric versions
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+    post:
+      operationId: projects_rubrics_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rubric'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Create the next draft rubric version
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/projects/{id}/rubrics/{version}/:
+    get:
+      operationId: projects_rubrics_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: version
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rubric'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read one rubric version
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/projects/{id}/rubrics/{version}/approve/:
+    post:
+      operationId: projects_rubrics_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: version
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rubric'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Approve and lock a nonempty rubric
+      description: 'Permission: DELIVERY_MANAGER or ADMIN. Approved rubric versions are immutable; create
+        the next version to make changes.'
+  /api/projects/{id}/rubrics/{version}/skills/:
+    post:
+      operationId: projects_rubrics_skills_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: version
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rubric'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Add a skill to a draft rubric
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RubricSkillInput'
+  /api/projects/{id}/rubrics/{version}/skills/{item_id}/:
+    patch:
+      operationId: projects_rubrics_skills_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: version
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rubric'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Change a draft skill weight
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). This API operation changes
+        weight only; importance and required_months are set when adding the skill.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                weight:
+                  type: integer
+                  minimum: 1
+                  maximum: 2147483647
+              required:
+              - weight
+    delete:
+      operationId: projects_rubrics_skills_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: item_id
+        schema:
+          type: integer
+        required: true
+      - in: path
+        name: version
+        schema:
+          type: integer
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '204':
+          description: Success.
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Remove a draft rubric skill
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/projects/{id}/runs/:
+    get:
+      operationId: projects_runs_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MatchRun'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List stored match runs for a project
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+    post:
+      operationId: projects_runs_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: header
+        name: Idempotency-Key
+        required: true
+        schema: &id001
+          type: string
+        description: A nonempty caller-generated key; scoped to the organisation and bound to one project/payload.
+      tags:
+      - projects
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchRun'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '409':
+          description: 'State conflict: locked/closed/already performed, or reused idempotency key with
+            a different project or payload.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchRun'
+      summary: Create or retrieve an idempotent match run
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Uses the latest approved
+        rubric and snapshots structured inputs. Same key/project/payload returns existing run with 200;
+        changed project/payload returns 409. run_date defaults to the run creation date.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                run_date: &id005
+                  type: string
+                  format: date
+  /api/reports/utilisation/:
+    get:
+      operationId: reports_utilisation_retrieve
+      tags:
+      - reports
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Utilisation'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Summarise active internal consultant allocation
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Unknown allocation is counted
+        separately and excluded from mean allocation and on-bench counts. on_bench counts known allocation
+        below 100 percent, including partial availability.'
+  /api/results/{id}/reviews/:
+    post:
+      operationId: results_reviews_create
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - results
+      security:
+      - cookieAuth: []
+      responses:
+        '201':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewDecision'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Record a human decision for a result profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewInput'
+  /api/resumes/{id}/:
+    get:
+      operationId: resumes_retrieve
+      description: 'Permission: Staff; candidate may access only own version. '
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - resumes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeStatus'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read the scan status
+  /api/resumes/{id}/download/:
+    get:
+      operationId: resumes_download_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - resumes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Download an authorised processed PDF
+      description: 'Permission: Staff; candidate may access only own version. Quarantined, failed and
+        inaccessible files return 404. Always served as an attachment with a server-generated filename.'
+  /api/resumes/{id}/pages/{page}/:
+    get:
+      operationId: resumes_pages_retrieve
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Page numbering begins at
+        1; only processed versions with that rendered page are served.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: page
+        schema:
+          type: integer
+        required: true
+      tags:
+      - resumes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read a rendered resume-page image
+  /api/resumes/{id}/xray/:
+    get:
+      operationId: resumes_xray_retrieve
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Untrusted audit text is
+        data. All audit items have weight 0; a flag is never a score penalty.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - resumes
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumeXray'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read reviewer-only hidden-span audit
+  /api/runs/{id}/:
+    get:
+      operationId: runs_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - runs
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchRun'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read a stored match run
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/runs/{id}/dashboard/:
+    get:
+      operationId: runs_dashboard_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: group
+        schema:
+          type: string
+        description: ready, clarification or unmet (or stored READY, NEEDS_CLARIFICATION, UNMET value).
+      - in: query
+        name: resource_type
+        schema:
+          type: string
+          enum:
+          - INTERNAL
+          - EXTERNAL
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Case-insensitive name-snapshot substring.
+      - in: query
+        name: evidence
+        schema:
+          type: string
+          enum:
+          - '1'
+        description: 1 restricts to results with a positive evidence-factor contribution.
+      tags:
+      - runs
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardTotals'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Count the same filtered results shown on the shortlist
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). '
+  /api/runs/{id}/export.csv:
+    get:
+      operationId: runs_export.csv_retrieve
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Uses the same filters and
+        stored results as results/dashboard. Spreadsheet formula cells are neutralised. Response is an
+        attachment.'
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: group
+        schema:
+          type: string
+        description: ready, clarification or unmet (or stored READY, NEEDS_CLARIFICATION, UNMET value).
+      - in: query
+        name: resource_type
+        schema:
+          type: string
+          enum:
+          - INTERNAL
+          - EXTERNAL
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Case-insensitive name-snapshot substring.
+      - in: query
+        name: evidence
+        schema:
+          type: string
+          enum:
+          - '1'
+        description: 1 restricts to results with a positive evidence-factor contribution.
+      tags:
+      - runs
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Download the same filtered shortlist as CSV
+  /api/runs/{id}/export.xlsx:
+    get:
+      operationId: runs_export.xlsx_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: group
+        schema:
+          type: string
+        description: ready, clarification or unmet (or stored READY, NEEDS_CLARIFICATION, UNMET value).
+      - in: query
+        name: resource_type
+        schema:
+          type: string
+          enum:
+          - INTERNAL
+          - EXTERNAL
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Case-insensitive name-snapshot substring.
+      - in: query
+        name: evidence
+        schema:
+          type: string
+          enum:
+          - '1'
+        description: 1 restricts to results with a positive evidence-factor contribution.
+      tags:
+      - runs
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Download the same filtered shortlist as XLSX
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Uses the same filters and
+        stored results as results/dashboard. Spreadsheet formula cells are neutralised. Response is an
+        attachment.'
+  /api/runs/{id}/reproduce/:
+    post:
+      operationId: runs_reproduce_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - runs
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reproduction'
+        '400':
+          description: Invalid input, unsupported decision, or refused operation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Recompute a run from its frozen inputs
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Read-only verification;
+        does not create a new run or change published scores.'
+  /api/runs/{id}/results/:
+    get:
+      operationId: runs_results_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: query
+        name: group
+        schema:
+          type: string
+        description: ready, clarification or unmet (or stored READY, NEEDS_CLARIFICATION, UNMET value).
+      - in: query
+        name: resource_type
+        schema:
+          type: string
+          enum:
+          - INTERNAL
+          - EXTERNAL
+      - in: query
+        name: q
+        schema:
+          type: string
+        description: Case-insensitive name-snapshot substring.
+      - in: query
+        name: evidence
+        schema:
+          type: string
+          enum:
+          - '1'
+        description: 1 restricts to results with a positive evidence-factor contribution.
+      - in: query
+        name: page
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+        description: Invalid or nonpositive values fall back to page 1; page_size is fixed at 25.
+      tags:
+      - runs
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchResultsPage'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+        '404':
+          description: No accessible object exists (including another organisation).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: Read ranked stored results with evidence breakdown
+      description: 'Permission: Staff (RECRUITER, DELIVERY_MANAGER or ADMIN). Ranks and scores are stored
+        snapshots. Review groups are workflow labels; no candidate is automatically rejected.'
+  /api/skills/:
+    get:
+      operationId: skills_retrieve
+      tags:
+      - skills
+      security:
+      - cookieAuth: []
+      responses:
+        '200':
+          description: Success.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Skill'
+        '403':
+          description: Authentication, membership, role or CSRF check failed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorDetail'
+      summary: List the controlled skill vocabulary
+      description: 'Permission: Any active member. '
+components:
+  schemas:
+    CandidateProfile:
+      type: object
+      description: 'A candidate''s own view: bench fields and the resource type are not theirs to set.'
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        resource_type:
+          allOf:
+          - $ref: '#/components/schemas/ResourceTypeEnum'
+          readOnly: true
+        display_name:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        phone:
+          type: string
+          maxLength: 40
+        college:
+          type: string
+          maxLength: 200
+        allocation_pct:
+          type: integer
+          readOnly: true
+          nullable: true
+        available_from:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        notice_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+          nullable: true
+        source_system:
+          type: string
+          readOnly: true
+        external_id:
+          type: string
+          readOnly: true
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillClaim'
+          readOnly: true
+      required:
+      - allocation_pct
+      - available_from
+      - claims
+      - display_name
+      - external_id
+      - id
+      - resource_type
+      - source_system
+      - title
+    PaginatedProfileList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Profile'
+    PatchedCandidateProfile:
+      type: object
+      description: 'A candidate''s own view: bench fields and the resource type are not theirs to set.'
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        resource_type:
+          allOf:
+          - $ref: '#/components/schemas/ResourceTypeEnum'
+          readOnly: true
+        display_name:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        phone:
+          type: string
+          maxLength: 40
+        college:
+          type: string
+          maxLength: 200
+        allocation_pct:
+          type: integer
+          readOnly: true
+          nullable: true
+        available_from:
+          type: string
+          format: date
+          readOnly: true
+          nullable: true
+        notice_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+          nullable: true
+        source_system:
+          type: string
+          readOnly: true
+        external_id:
+          type: string
+          readOnly: true
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillClaim'
+          readOnly: true
+    PatchedProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        resource_type:
+          $ref: '#/components/schemas/ResourceTypeEnum'
+        display_name:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        phone:
+          type: string
+          maxLength: 40
+        college:
+          type: string
+          maxLength: 200
+        allocation_pct:
+          type: integer
+          maximum: 100
+          minimum: 0
+          nullable: true
+        available_from:
+          type: string
+          format: date
+          nullable: true
+        notice_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+          nullable: true
+        source_system:
+          type: string
+          readOnly: true
+        external_id:
+          type: string
+          readOnly: true
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillClaim'
+          readOnly: true
+    PatchedProject:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        required_allocation_pct:
+          type: integer
+          maximum: 100
+          minimum: 1
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        resource_type:
+          $ref: '#/components/schemas/ResourceTypeEnum'
+        display_name:
+          type: string
+          maxLength: 200
+        title:
+          type: string
+          maxLength: 200
+        email:
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        phone:
+          type: string
+          maxLength: 40
+        college:
+          type: string
+          maxLength: 200
+        allocation_pct:
+          type: integer
+          maximum: 100
+          minimum: 0
+          nullable: true
+        available_from:
+          type: string
+          format: date
+          nullable: true
+        notice_days:
+          type: integer
+          maximum: 3650
+          minimum: 0
+          nullable: true
+        source_system:
+          type: string
+          readOnly: true
+        external_id:
+          type: string
+          readOnly: true
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/SkillClaim'
+          readOnly: true
+      required:
+      - claims
+      - display_name
+      - external_id
+      - id
+      - source_system
+      - title
+    Project:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        name:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        status:
+          allOf:
+          - $ref: '#/components/schemas/StatusEnum'
+          readOnly: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        required_allocation_pct:
+          type: integer
+          maximum: 100
+          minimum: 1
+      required:
+      - id
+      - name
+      - status
+    ProvenanceEnum:
+      enum:
+      - FORM
+      - IMPORT
+      type: string
+      description: '* `FORM` - Form claim
+
+        * `IMPORT` - Imported'
+    ResourceTypeEnum:
+      enum:
+      - EXTERNAL
+      - INTERNAL
+      type: string
+      description: '* `EXTERNAL` - External applicant
+
+        * `INTERNAL` - Internal consultant'
+    SkillClaim:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        skill:
+          type: string
+          readOnly: true
+        provenance:
+          allOf:
+          - $ref: '#/components/schemas/ProvenanceEnum'
+          readOnly: true
+        months:
+          type: integer
+          readOnly: true
+          nullable: true
+        confirmed:
+          type: boolean
+          readOnly: true
+      required:
+      - confirmed
+      - id
+      - months
+      - provenance
+      - skill
+    StatusEnum:
+      enum:
+      - DRAFT
+      - OPEN
+      - CLOSED
+      type: string
+      description: '* `DRAFT` - Draft
+
+        * `OPEN` - Open
+
+        * `CLOSED` - Closed'
+    ErrorDetail:
+      type: object
+      properties:
+        detail: *id001
+      required:
+      - detail
+    ValidationError:
+      type: object
+      additionalProperties: true
+      description: Field names map to messages or arrays of messages; detail is used for service errors.
+    Skill:
+      type: object
+      properties:
+        id: &id002
+          type: integer
+        name: *id001
+        category: *id001
+      required:
+      - id
+      - name
+      - category
+    RubricSkill:
+      type: object
+      properties:
+        id: *id002
+        skill: *id001
+        importance: &id003
+          type: string
+          enum:
+          - REQUIRED
+          - PREFERRED
+        weight: *id002
+        required_months: *id002
+      required:
+      - id
+      - skill
+      - importance
+      - weight
+      - required_months
+    Rubric:
+      type: object
+      properties:
+        id: *id002
+        version: *id002
+        status:
+          type: string
+          enum:
+          - DRAFT
+          - APPROVED
+        approved_by:
+          type: integer
+          nullable: true
+        approved_at:
+          type: string
+          format: date-time
+          nullable: true
+        skills:
+          type: array
+          items:
+            $ref: '#/components/schemas/RubricSkill'
+      required:
+      - id
+      - version
+      - status
+      - approved_by
+      - approved_at
+      - skills
+    RubricSkillInput:
+      type: object
+      properties:
+        skill: *id001
+        importance: *id003
+        weight:
+          type: integer
+          minimum: 1
+          maximum: 2147483647
+        required_months:
+          type: integer
+          minimum: 0
+          maximum: 32767
+          default: 0
+      required:
+      - skill
+      - importance
+      - weight
+    EvidenceSpan:
+      type: object
+      properties:
+        id: &id004
+          type: string
+          format: uuid
+        skill: *id001
+        quote: *id001
+        page: *id002
+        section: *id001
+        state:
+          type: string
+          enum:
+          - PROVISIONAL
+          - ACCEPTED
+          - EXCLUDED
+          - NEGATED
+          - ASPIRATIONAL
+          - NOTICE
+        ambiguous: &id007
+          type: boolean
+      required:
+      - id
+      - skill
+      - quote
+      - page
+      - section
+      - state
+      - ambiguous
+    ReviewInput:
+      type: object
+      properties:
+        outcome:
+          type: string
+          enum:
+          - ACCEPT
+          - EXCLUDE
+          - VERIFIED
+          - UNMET
+          - OVERRIDE
+        reason:
+          type: string
+          minLength: 1
+        span_id: *id004
+        skill_id: *id002
+        months:
+          type: integer
+          minimum: 0
+          maximum: 1200
+          nullable: true
+        method:
+          type: string
+          enum:
+          - TEST
+          - INTERVIEW
+      description: ACCEPT/EXCLUDE require span_id. VERIFIED/UNMET/OVERRIDE require skill_id; VERIFIED
+        also requires TEST or INTERVIEW. Own-profile decisions are refused. A new run is needed to publish
+        changed evidence; old runs stay frozen.
+      required:
+      - outcome
+      - reason
+    ReviewDecision:
+      type: object
+      properties:
+        id: *id004
+        outcome:
+          type: string
+          enum:
+          - ACCEPT
+          - EXCLUDE
+          - VERIFIED
+          - UNMET
+          - OVERRIDE
+      required:
+      - id
+      - outcome
+    MatchRun:
+      type: object
+      properties:
+        id: *id004
+        project: *id004
+        rubric_version: *id002
+        dictionary_version: *id002
+        algorithm_version: *id001
+        run_date: *id005
+        status:
+          type: string
+          enum:
+          - COMPLETED
+          - FAILED
+        results: *id002
+      required:
+      - id
+      - project
+      - rubric_version
+      - dictionary_version
+      - algorithm_version
+      - run_date
+      - status
+      - results
+    Contribution:
+      type: object
+      properties:
+        skill: *id001
+        importance: *id003
+        weight: *id002
+        e: &id006
+          type: string
+          description: Decimal serialized as text; never recompute a score client-side.
+        credit: *id006
+        label: *id001
+        duration_estimated: *id007
+        evidence_span: &id008
+          type: string
+          format: uuid
+          nullable: true
+        passage:
+          type: string
+          nullable: true
+        page:
+          type: integer
+          nullable: true
+      required:
+      - skill
+      - importance
+      - weight
+      - e
+      - credit
+      - label
+      - duration_estimated
+      - evidence_span
+      - passage
+      - page
+    ChangeReason:
+      type: object
+      properties:
+        decision_id: *id008
+        skill: *id001
+        old_e: *id006
+        new_e: *id006
+        old_credit: *id006
+        new_credit: *id006
+        reason: *id001
+      description: old_credit/new_credit are present for newly recorded changes; historical entries may
+        omit them.
+      required:
+      - decision_id
+      - skill
+      - old_e
+      - new_e
+      - reason
+    LaterChanges:
+      type: object
+      properties:
+        run: *id004
+        coverage: *id006
+        reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChangeReason'
+      nullable: true
+      required:
+      - run
+      - coverage
+      - reasons
+    MatchResult:
+      type: object
+      properties:
+        id: *id004
+        profile: *id004
+        name: *id001
+        resource_type:
+          type: string
+          enum:
+          - INTERNAL
+          - EXTERNAL
+        coverage: *id006
+        staffing_fit: *id006
+        availability_unknown: *id007
+        mandatory_coverage: *id006
+        missing_must_haves: *id002
+        review_group: &id009
+          type: string
+          enum:
+          - READY
+          - NEEDS_CLARIFICATION
+          - UNMET
+        group_reason: *id001
+        rank: *id002
+        matched:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contribution'
+        unresolved:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contribution'
+        missing:
+          type: array
+          items:
+            $ref: '#/components/schemas/Contribution'
+        change_reasons:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChangeReason'
+        later_changes:
+          $ref: '#/components/schemas/LaterChanges'
+      required:
+      - id
+      - profile
+      - name
+      - resource_type
+      - coverage
+      - staffing_fit
+      - availability_unknown
+      - mandatory_coverage
+      - missing_must_haves
+      - review_group
+      - group_reason
+      - rank
+      - matched
+      - unresolved
+      - missing
+      - change_reasons
+      - later_changes
+    MatchResultsPage:
+      type: object
+      properties:
+        count: *id002
+        page: *id002
+        page_size:
+          type: integer
+          enum:
+          - 25
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/MatchResult'
+      required:
+      - count
+      - page
+      - page_size
+      - results
+    ReproducedResult:
+      type: object
+      properties:
+        profile: *id004
+        coverage: *id006
+        staffing_fit: *id006
+        group: *id009
+        rank: *id002
+      required:
+      - profile
+      - coverage
+      - staffing_fit
+      - group
+      - rank
+    Reproduction:
+      type: object
+      properties:
+        identical: *id007
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReproducedResult'
+        checked_at: &id010
+          type: string
+          format: date-time
+      required:
+      - identical
+      - results
+      - checked_at
+    DashboardTotals:
+      type: object
+      properties:
+        total: *id002
+        READY: *id002
+        NEEDS_CLARIFICATION: *id002
+        UNMET: *id002
+      required:
+      - total
+      - READY
+      - NEEDS_CLARIFICATION
+      - UNMET
+    Utilisation:
+      type: object
+      properties:
+        consultants: *id002
+        known: *id002
+        unknown: *id002
+        mean_allocation_pct:
+          type: number
+          nullable: true
+        on_bench: *id002
+      required:
+      - consultants
+      - known
+      - unknown
+      - mean_allocation_pct
+      - on_bench
+    CandidateUpload:
+      type: object
+      properties:
+        id: *id004
+        version: *id002
+        status:
+          type: string
+          enum:
+          - PENDING
+          - FAILED
+          - PROCESSED
+        recovery_message: *id001
+      required:
+      - id
+      - version
+      - status
+      - recovery_message
+    UploadAccepted:
+      type: object
+      properties:
+        id: *id004
+        version: *id002
+        status: *id001
+      description: Own upload returns PENDING. Staff upload returns the current internal status (QUARANTINED,
+        CLEAN, FLAGGED or FAILED); development scans may already have completed inline.
+      required:
+      - id
+      - version
+      - status
+    ResumeStatus:
+      type: object
+      properties:
+        id: *id004
+        version: *id002
+        status: *id001
+        recovery_message: *id001
+        scanned_pages:
+          type: array
+          items: *id002
+      description: Candidates see PENDING/FAILED/PROCESSED; CLEAN and FLAGGED are deliberately indistinguishable.
+        Staff see internal status and scanned_pages.
+      required:
+      - id
+      - version
+      - status
+      - recovery_message
+    HiddenSpanAudit:
+      type: object
+      properties:
+        id: *id004
+        page:
+          type: integer
+          nullable: true
+        bbox:
+          type: array
+          items:
+            type: number
+          nullable: true
+        vector: *id001
+        field_name: *id001
+        text: *id001
+        true_length: *id002
+        note_only: *id007
+        disposition: *id001
+        weight:
+          type: integer
+          enum:
+          - 0
+      required:
+      - id
+      - page
+      - bbox
+      - vector
+      - field_name
+      - text
+      - true_length
+      - note_only
+      - disposition
+      - weight
+    ResumeXray:
+      type: object
+      properties:
+        id: *id004
+        status: *id001
+        strip_counts:
+          type: object
+          additionalProperties: *id002
+        audits:
+          type: array
+          items:
+            $ref: '#/components/schemas/HiddenSpanAudit'
+      required:
+      - id
+      - status
+      - strip_counts
+      - audits
+    FormClaimInput:
+      type: object
+      properties:
+        skill: *id001
+        months:
+          type: integer
+          minimum: 0
+          maximum: 1200
+          nullable: true
+      required:
+      - skill
+    DataRequestInput:
+      type: object
+      properties:
+        kind:
+          type: string
+          enum:
+          - CORRECTION
+          - DELETION
+      required:
+      - kind
+    DataRequestCreated:
+      type: object
+      properties:
+        id: *id002
+        kind:
+          type: string
+          enum:
+          - CORRECTION
+          - DELETION
+      required:
+      - id
+      - kind
+    ImportSummary:
+      type: object
+      properties:
+        id: *id004
+        status: &id011
+          type: string
+          enum:
+          - PREVIEW
+          - CONFIRMED
+          - ROLLED_BACK
+        source: *id001
+      required:
+      - id
+      - status
+      - source
+    ImportRowSummary:
+      type: object
+      properties:
+        row: *id002
+        state: &id012
+          type: string
+          enum:
+          - READY
+          - WITHHELD
+          - QUEUED
+          - IMPORTED
+          - UPDATED
+          - UNCHANGED
+          - LINKED
+          - CREATED
+          - SKIPPED
+        reason: *id001
+        external_id: *id001
+      required:
+      - row
+      - state
+      - reason
+      - external_id
+    ImportChange:
+      type: object
+      properties:
+        profile: *id004
+        field: *id001
+        previous:
+          nullable: true
+        imported:
+          nullable: true
+        at: *id010
+      required:
+      - profile
+      - field
+      - previous
+      - imported
+      - at
+    ImportBatch:
+      type: object
+      properties:
+        id: *id004
+        status: *id011
+        source_system: *id001
+        source_digest: *id001
+        mapping_version: *id002
+        mapping:
+          type: object
+          additionalProperties: *id001
+        insert_count: *id002
+        update_count: *id002
+        unchanged_count: *id002
+        withheld_count: *id002
+        queued_count: *id002
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportRowSummary'
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportChange'
+      required:
+      - id
+      - status
+      - source_system
+      - source_digest
+      - mapping_version
+      - mapping
+      - insert_count
+      - update_count
+      - unchanged_count
+      - withheld_count
+      - queued_count
+      - rows
+      - changes
+    ImportQueueRow:
+      type: object
+      properties:
+        id: *id004
+        row: *id002
+        reason: *id001
+        incoming:
+          type: object
+          additionalProperties: *id001
+        existing:
+          type: object
+          properties:
+            id: *id004
+            name: *id001
+          required:
+          - id
+          - name
+      required:
+      - id
+      - row
+      - reason
+      - incoming
+      - existing
+    ImportQueueResolved:
+      type: object
+      properties:
+        id: *id004
+        state: *id012
+      required:
+      - id
+      - state
+    ImportRollback:
+      type: object
+      properties:
+        reverted: *id002
+        kept_later_edits: *id002
+        archived: *id002
+      required:
+      - reverted
+      - kept_later_edits
+      - archived
+    MyProfile:
+      allOf:
+      - $ref: '#/components/schemas/CandidateProfile'
+      - type: object
+        properties:
+          uploads:
+            type: array
+            items:
+              $ref: '#/components/schemas/CandidateUpload'
+          correction_route:
+            type: object
+            properties:
+              edit_profile: *id001
+              add_skill: *id001
+              upload_new_version: *id001
+              data_request: *id001
+            required:
+            - edit_profile
+            - add_skill
+            - upload_new_version
+            - data_request
+        required:
+        - uploads
+        - correction_route
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid

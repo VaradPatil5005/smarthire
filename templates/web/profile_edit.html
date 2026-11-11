@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Edit {{ profile.display_name }}{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'profile-detail' profile.pk %}">Back to the profile</a>
+<h1>Edit {{ profile.display_name }}</h1>
+<p class="hero-sub">Changes apply to future runs. Past runs keep the details they ran with.</p>
+{% endblock %}
+{% block content %}
+<section class="panel narrow">
+  <form method="post">{% csrf_token %}
+    {% include "web/_profile_fields.html" %}
+    {% if form %}{% include "web/_bench_fields.html" with selected_type=form.resource_type %}{% else %}{% include "web/_bench_fields.html" with selected_type=profile.resource_type %}{% endif %}
+    <div class="d-flex gap-2 mt-4 flex-wrap"><button class="btn btn-primary" type="submit">Save changes</button><a class="btn btn-outline-secondary" href="{% url 'profile-detail' profile.pk %}">Cancel</a></div>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,53 @@
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path("", views.home, name="home"),
+    path("me/", views.me, name="me"),
+    path("me/skills/", views.me_add_skill, name="me-add-skill"),
+    path("me/upload/", views.me_upload, name="me-upload"),
+    path("me/data-request/", views.me_data_request, name="me-data-request"),
+    path("profiles/", views.profile_list, name="profile-list"),
+    path("profiles/<uuid:pk>/", views.profile_detail, name="profile-detail"),
+    path("profiles/<uuid:pk>/edit/", views.profile_edit, name="profile-edit"),
+    path("profiles/<uuid:pk>/upload/", views.profile_upload, name="profile-upload"),
+    path(
+        "profiles/<uuid:pk>/requests/resolve/",
+        views.data_request_resolve,
+        name="data-request-resolve",
+    ),
+    path("requests/", views.data_requests, name="data-requests"),
+    path("profiles/<uuid:pk>/decide/", views.profile_decide, name="profile-decide"),
+    path("resumes/<uuid:pk>/xray/", views.xray, name="xray"),
+    path("projects/", views.project_list, name="project-list"),
+    path("projects/<uuid:pk>/", views.project_detail, name="project-detail"),
+    path("projects/<uuid:pk>/edit/", views.project_edit, name="project-edit"),
+    path("projects/<uuid:pk>/skills/", views.project_add_skill, name="project-add-skill"),
+    path(
+        "projects/<uuid:pk>/skills/<int:item_id>/",
+        views.project_skill_edit,
+        name="project-skill-edit",
+    ),
+    path(
+        "projects/<uuid:pk>/skills/<int:item_id>/remove/",
+        views.project_skill_remove,
+        name="project-skill-remove",
+    ),
+    path("projects/<uuid:pk>/approve/", views.project_approve, name="project-approve"),
+    path("projects/<uuid:pk>/revise/", views.project_revise, name="project-revise"),
+    path("projects/<uuid:pk>/close/", views.project_close, name="project-close"),
+    path("projects/<uuid:pk>/run/", views.project_run, name="project-run"),
+    path("runs/<uuid:pk>/", views.shortlist, name="shortlist"),
+    path("results/<uuid:pk>/", views.result_detail, name="result-detail"),
+    path("bench/", views.bench, name="bench"),
+    path("dashboard/", views.dashboard, name="dashboard"),
+    path("utilisation/", views.utilisation, name="utilisation"),
+    path("imports/", views.import_list, name="import-list"),
+    path("imports/queue/", views.import_queue, name="import-queue"),
+    path("imports/queue/<uuid:pk>/", views.import_queue_resolve, name="import-queue-resolve"),
+    path("imports/<uuid:pk>/", views.import_detail, name="import-detail"),
+    path("imports/<uuid:pk>/mapping/", views.import_mapping, name="import-mapping"),
+    path("imports/<uuid:pk>/confirm/", views.import_confirm, name="import-confirm"),
+    path("imports/<uuid:pk>/rollback/", views.import_rollback, name="import-rollback"),
+]

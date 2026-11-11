@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Import batch · SmartHireAI{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'import-list' %}">All imports</a>
+<div class="hero-row">
+  <div><h1>Import from {{ batch.source_system }}</h1><p class="hero-sub"><span class="badge badge-type">{{ batch.get_status_display }}</span> · Inserted {{ batch.insert_count }} · updated {{ batch.update_count }} · unchanged {{ batch.unchanged_count }} · withheld {{ batch.withheld_count }} · in queue {{ batch.queued_count }}</p></div>
+  <div class="hero-actions">
+    {% if batch.status == 'PREVIEW' and complete %}<form method="post" action="{% url 'import-confirm' batch.pk %}">{% csrf_token %}<button class="btn btn-light-pill" type="submit">{% icon "check" %}Confirm these counts and import</button></form>{% endif %}
+    {% if batch.status == 'CONFIRMED' %}<form method="post" action="{% url 'import-rollback' batch.pk %}" data-confirm="Roll back this batch? Later manual edits are kept.">{% csrf_token %}<button class="btn btn-ghost" type="submit">Roll back this batch</button></form>{% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+{% if batch.status == 'PREVIEW' %}
+<section class="panel" aria-labelledby="map-h"><h2 class="panel-title" id="map-h">Check the column mapping <span class="badge badge-type">v{{ batch.mapping_version }}</span></h2>
+  {% if not complete %}<div class="alert alert-danger" role="alert">Some columns were not recognised. Map one column to the ID and one to the name to continue.</div>{% endif %}
+  <form method="post" action="{% url 'import-mapping' batch.pk %}">{% csrf_token %}
+    <div class="row g-3">
+      {% for column in columns %}
+      <div class="col-sm-6 col-lg-4"><label class="form-label" for="map_{{ column.index }}">{{ column.header }}</label>
+        <select class="form-select" id="map_{{ column.index }}" name="map_{{ column.index }}"><option value="">Ignore this column</option>{% for value, label in field_choices %}<option value="{{ value }}" {% if column.field == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+      {% endfor %}
+    </div>
+    <button class="btn btn-outline-primary mt-3" type="submit">Apply mapping</button>
+  </form>
+</section>
+{% else %}
+<p class="muted-note">Mapping v{{ batch.mapping_version }}: {% for header, field in batch.mapping.items %}{{ header }} → {{ field }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+{% endif %}
+<section class="panel" aria-labelledby="rows-h"><h2 class="panel-title" id="rows-h">Rows</h2>
+  <div class="table-wrap"><table class="table table-stack"><caption class="visually-hidden">Rows</caption><thead><tr><th scope="col">Row</th><th scope="col">ID</th><th scope="col">Outcome</th><th scope="col">Reason</th></tr></thead>
+  <tbody>{% for row in rows %}<tr><td data-label="Row">{{ row.row_number }}</td><td data-label="ID">{{ row.external_id }}</td><td data-label="Outcome"><span class="badge {% if row.state == 'WITHHELD' %}badge-unmet{% elif row.state == 'QUEUED' %}badge-clarify{% else %}badge-type{% endif %}">{{ row.get_state_display }}</span></td><td data-label="Reason">{{ row.reason }}</td></tr>{% empty %}<tr><td colspan="4" data-label="" class="empty-state">{% if complete %}This file had no rows.{% else %}Rows appear once the columns are mapped.{% endif %}</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

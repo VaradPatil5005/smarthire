@@ -1,0 +1,45 @@
+{% load static ui %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="htmx-config" content='{"includeIndicatorStyles":false,"allowEval":false}'>
+  <title>{% block title %}SmartHireAI{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+<a class="skip-link" href="#main">Skip to content</a>
+{% block shell %}
+<header class="hero">
+  <div class="hero-bar">
+    <a class="wordmark" href="{% url 'home' %}">SMARTHIRE</a>
+    {% if request.membership %}<span class="hero-org">{{ request.membership.organisation.name }} · {{ request.membership.get_role_display }}</span>{% endif %}
+    {% if request.user.is_authenticated %}
+    <form method="post" action="{% url 'logout' %}" class="{% if not request.membership %}ms-auto{% endif %}">{% csrf_token %}<button class="hero-round" type="submit" aria-label="Log out" title="Log out">{% icon "logout" %}</button></form>
+    {% endif %}
+  </div>
+  {% block hero %}{% endblock %}
+</header>
+<main id="main" class="page" tabindex="-1">
+  {% for message in messages %}
+  <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %}" role="status">{{ message }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+{% if request.membership.is_staff_role %}
+<nav class="pillnav" aria-label="Main">
+  <a {% nav_state "dashboard" %} href="{% url 'dashboard' %}">{% icon "home" %}<span>Dashboard</span></a>
+  <a {% nav_state "projects" %} href="{% url 'project-list' %}">{% icon "projects" %}<span>Projects</span></a>
+  <a {% nav_state "profiles" %} href="{% url 'profile-list' %}">{% icon "profiles" %}<span>Profiles</span></a>
+  <a {% nav_state "bench" %} href="{% url 'bench' %}">{% icon "bench" %}<span>Bench</span></a>
+  <a {% nav_state "utilisation" %} href="{% url 'utilisation' %}">{% icon "chart" %}<span>Utilisation</span></a>
+  {% if request.membership.role == 'ADMIN' %}<a {% nav_state "imports" %} href="{% url 'import-list' %}">{% icon "import" %}<span>Imports</span></a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}
+<script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'vendor/htmx.min.js' %}"></script>
+<script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

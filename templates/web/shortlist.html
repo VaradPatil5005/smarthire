@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Shortlist · {{ project.name }}{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'project-detail' project.pk %}">Back to the project</a>
+<div class="hero-row">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="hero-sub">{% if is_latest %}Latest shortlist{% else %}<strong>An older run, kept as it was</strong>{% endif %} · {{ run.run_date|date:"j M Y" }} · {{ tabs_total }} candidate{{ tabs_total|pluralize }}</p>
+  </div>
+  <div class="hero-actions">
+    <a class="btn btn-ghost" href="/api/runs/{{ run.pk }}/export.csv?{{ export_query }}">{% icon "download" %}Export CSV</a>
+    <a class="btn btn-ghost" href="/api/runs/{{ run.pk }}/export.xlsx?{{ export_query }}">{% icon "download" %}Export XLSX</a>
+  </div>
+</div>
+{% endblock %}
+{% block content %}
+<p class="score-note">{{ note }}</p>
+<details class="fold explain">
+  <summary><span>How to read these two numbers</span>{% icon "chevron" "chev" %}</summary>
+  <div class="fold-body">
+    <p class="mb-2"><strong>Coverage</strong> is the share of this project's weighted skills backed by evidence a reviewer accepted. <strong>Staffing fit</strong> is about timing and capacity only, and never changes Coverage: a strong consultant on a long notice period is later, not weaker.</p>
+    <p class="muted-note mb-0">Pinned to rubric v{{ run.rubric_version.version }}, dictionary v{{ run.dictionary_version.number }} and algorithm {{ run.algorithm_version }}, so this run can be reproduced.</p>
+  </div>
+</details>
+<nav class="tabs" aria-label="Review groups">
+  <a class="tab {% if not group %}active{% endif %}" {% if not group %}aria-current="true"{% endif %} href="?{{ tabs_query }}">All <span class="tab-count">{{ tabs_total }}</span></a>
+  {% for tab in tabs %}<a class="tab {% if group == tab.key %}active{% endif %}" {% if group == tab.key %}aria-current="true"{% endif %} href="?{% if tabs_query %}{{ tabs_query }}&amp;{% endif %}group={{ tab.key }}">{{ tab.label }} <span class="tab-count">{{ tab.count }}</span></a>{% endfor %}
+</nav>
+<form method="get" class="panel row g-2 align-items-end" role="search">
+  {% if group %}<input type="hidden" name="group" value="{{ group }}">{% endif %}
+  <div class="col-md-5"><label class="form-label" for="fq">Search by name</label><input class="form-control" id="fq" name="q" value="{{ q }}"></div>
+  <div class="col-md-3"><label class="form-label" for="ft">Type</label><select class="form-select" id="ft" name="resource_type"><option value="">All</option>{% for value, label in type_choices %}<option value="{{ value }}" {% if resource_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="col-auto d-flex align-items-center pb-2"><div class="form-check"><input class="form-check-input" type="checkbox" id="fe" name="evidence" value="1" {% if with_evidence %}checked{% endif %}><label class="form-check-label" for="fe">Only with evidence</label></div></div>
+  <div class="col-auto"><button class="btn btn-outline-primary" type="submit">Apply</button></div>
+  <div class="col-auto ms-auto pb-2 muted-note">Showing <strong id="total">{{ total }}</strong></div>
+</form>
+<div class="row g-3">
+  <div class="col-lg-7">
+    {% for group_item in groups %}
+    <section class="panel" aria-labelledby="g-{{ group_item.key }}"><h2 class="panel-title group-heading-{{ group_item.key }}" id="g-{{ group_item.key }}">{{ group_item.label }}</h2>
+      <div class="table-wrap"><table class="table align-middle table-stack table-cards"><caption class="visually-hidden">{{ group_item.label }}</caption><thead><tr><th scope="col">Rank</th><th scope="col">Candidate</th><th scope="col">Coverage</th><th scope="col">Staffing fit</th><th scope="col">Next</th></tr></thead>
+      <tbody>{% for row in group_item.rows %}{% with result=row.result %}<tr class="{% if not result.coverage %}row-zero{% endif %}">
+        <td data-label="Rank">{{ result.rank }}</td>
+        <td data-label=""><a class="candidate-link" href="{% url 'result-detail' result.pk %}" hx-get="{% url 'result-detail' result.pk %}" hx-target="#drawer">{{ result.name_snapshot }}</a> <span class="badge badge-type">{{ result.get_resource_type_snapshot_display }}</span>{% if row.needs %}<span class="needs">{{ row.needs }}</span>{% endif %}</td>
+        <td data-label="Coverage"><span class="score-cell">{% include "web/_ring.html" with value=result.coverage group=result.review_group %}<span class="score">{{ result.coverage }}</span></span></td>
+        <td data-label="Staffing fit"><span class="score">{{ result.staffing_fit }}</span>{% if result.availability_unknown %}<span class="needs">availability unknown</span>{% endif %}</td>
+        <td data-label="Next"><a href="{% url 'profile-detail' result.profile_id %}#evidence">{{ row.action }}</a></td>
+      </tr>{% endwith %}{% endfor %}</tbody></table></div>
+    </section>
+    {% endfor %}
+    {% if not any_results %}<section class="panel"><p class="empty-state mb-0">No candidates match these filters. Clear the search or choose another group.</p></section>{% endif %}
+    {% include "web/_pagination.html" %}
+  </div>
+  <aside class="col-lg-5"><div class="panel drawer" id="drawer" tabindex="-1" aria-live="polite"><p class="empty-state mb-0">Choose a candidate to see why they scored what they did.</p></div></aside>
+</div>
+{% endblock %}

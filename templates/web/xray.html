@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load l10n ui %}
+{% block title %}X-ray · {{ profile.display_name }}{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'profile-detail' profile.pk %}">Back to the profile</a>
+<h1>X-ray: {{ profile.display_name }}, version {{ version.version }}</h1>
+<p class="hero-sub">Text the file contains but a reader would not see. It carries zero weight, and no score was reduced. A person decides what this means.</p>
+{% endblock %}
+{% block content %}
+<div class="xray-layout">
+  <section class="panel" aria-labelledby="page-h"><h2 class="panel-title" id="page-h">Rendered page</h2>
+    {% for page in pages %}
+    <svg class="xray-page mb-2" viewBox="0 0 {{ page.width|unlocalize }} {{ page.height|unlocalize }}" role="img" aria-label="Page {{ page.number }}, with {{ page.boxes|length }} hidden regions marked">
+      <image href="/api/resumes/{{ version.pk }}/pages/{{ page.number }}/" width="{{ page.width|unlocalize }}" height="{{ page.height|unlocalize }}"></image>
+      {% for box in page.boxes %}<rect class="xray-box" x="{{ box.x|unlocalize }}" y="{{ box.y|unlocalize }}" width="{{ box.width|unlocalize }}" height="{{ box.height|unlocalize }}"><title>{{ box.vector }}</title></rect>{% endfor %}
+    </svg>
+    {% empty %}<p class="empty-state">No rendered page is available for this version.</p>{% endfor %}
+  </section>
+  <section class="panel" aria-labelledby="spans-h"><h2 class="panel-title" id="spans-h">What was hidden</h2>
+    <ul class="rows">{% for audit in audits %}<li class="row-item"><div class="row-main"><span class="badge text-bg-dark">{{ audit.vector }}</span>{% if audit.page %} <span class="muted-note">page {{ audit.page }}</span>{% endif %}{% if audit.field_name %} <span class="muted-note">field {{ audit.field_name }}</span>{% endif %} <span class="muted-note">weight 0{% if audit.note_only %}, note only{% endif %}</span>
+      <div class="hidden-text">{{ audit.text }}</div>{% if audit.true_length > audit.text|length %}<div class="muted-note">Showing the first {{ audit.text|length }} of {{ audit.true_length }} characters.</div>{% endif %}</div></li>
+    {% empty %}<li class="empty-state">Nothing hidden was found in this file.</li>{% endfor %}</ul>
+    <p class="muted-note mt-3 mb-0">These checks catch the tricks we tested. They do not prove a file hides nothing.</p>
+  </section>
+</div>
+{% endblock %}

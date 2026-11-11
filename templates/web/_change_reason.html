@@ -1,0 +1,1 @@
+{{ change.skill }}: {% if change.old_credit and change.old_e == change.new_e %}skill credit {{ change.old_credit }} → {{ change.new_credit }}{% else %}e {{ change.old_e }} → {{ change.new_e }}{% endif %}. {{ change.reason }}

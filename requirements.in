@@ -1,0 +1,13 @@
+# Runtime dependencies (CLAUDE.md §2). Compile with `make lock`; never edit the .txt by hand.
+Django>=5.2,<5.3
+djangorestframework
+drf-spectacular[sidecar]
+dj-database-url
+psycopg[binary]
+argon2-cffi
+django-q2
+PyMuPDF
+pdfplumber
+spacy
+pandas
+openpyxl

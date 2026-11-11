@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Utilisation · SmartHireAI{% endblock %}
+{% block hero %}
+<h1>Utilisation</h1>
+{% if summary.consultants %}
+<p class="eyebrow">Mean allocation, over {{ summary.known }} consultant{{ summary.known|pluralize }} with a known figure</p>
+<div class="big-number">{% if summary.mean_allocation_pct is None %}Unknown{% else %}{{ summary.mean_allocation_pct }}%{% endif %}</div>
+<p class="hero-sub">Across {{ summary.consultants }} internal consultants. {{ summary.on_bench }} have free capacity{% if summary.unknown %}, and {{ summary.unknown }} unknown, not counted as free{% endif %}.</p>
+{% else %}<p class="hero-sub">How much of the bench is allocated.</p>{% endif %}
+{% endblock %}
+{% block content %}
+<section class="panel" aria-label="Allocation per consultant">
+  <ul class="rows">
+    {% for person in consultants %}
+    <li class="row-item">
+      <span class="avatar" aria-hidden="true">{{ person.display_name|initials }}</span>
+      <div class="row-main"><span class="row-title">{{ person.display_name }}</span>{% if person.allocation_pct is not None %}{% include "web/_meter.html" with value=person.allocation_pct %}{% endif %}</div>
+      <div class="row-end">{% if person.allocation_pct is not None %}<span class="score">{{ person.allocation_pct }}%</span>{% else %}<span class="muted-note">Unknown</span>{% endif %}</div>
+    </li>
+    {% empty %}
+    <li class="empty-state">No internal consultants yet.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endblock %}

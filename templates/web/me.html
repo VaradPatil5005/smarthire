@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}My profile · SmartHireAI{% endblock %}
+{% block hero %}
+<div class="identity">
+  <span class="avatar avatar-lg" aria-hidden="true">{% if profile %}{{ profile.display_name|initials }}{% else %}{{ request.user.username|initials }}{% endif %}</span>
+  <h1>{% if profile %}{{ profile.display_name }}{% else %}My profile{% endif %}</h1>
+  {% if profile %}<p class="hero-sub">{{ profile.title }}</p>{% else %}<p class="hero-sub">Tell us who you are to get started.</p>{% endif %}
+  {% if profile %}<span class="status-pill">{% icon "file" %}{% if uploads %}Résumé: {% if uploads.0.status == 'PENDING' %}being checked{% elif uploads.0.status == 'FAILED' %}could not be processed{% else %}processed{% endif %}{% else %}No résumé yet{% endif %}</span>{% endif %}
+</div>
+{% endblock %}
+{% block content %}
+<div class="narrow">
+{% if profile and not uploads %}
+<a class="ink-card" href="#resume"><span class="ink-card-icon">{% icon "file" %}</span><span>Add your résumé<small>Or add your skills by form. Either works.</small></span>{% icon "chevron" %}</a>
+{% elif profile and uploads.0.status == 'FAILED' %}
+<a class="ink-card" href="#resume"><span class="ink-card-icon">{% icon "alert" %}</span><span>Your last file could not be read<small>See what to do next</small></span>{% icon "chevron" %}</a>
+{% endif %}
+<section class="panel" aria-label="Profile sections">
+  <details class="fold" id="details" {% if not profile or errors %}open{% endif %}>
+    <summary><span class="row-icon">{% icon "profiles" %}</span>Personal details{% icon "chevron" "chev" %}</summary>
+    <div class="fold-body"><form method="post" action="{% url 'me' %}">{% csrf_token %}{% include "web/_profile_fields.html" %}<button class="btn btn-primary mt-3" type="submit">Save profile</button></form></div>
+  </details>
+  {% if profile %}
+  <details class="fold" id="skills">
+    <summary><span class="row-icon">{% icon "check" %}</span>Skills{% icon "chevron" "chev" %}</summary>
+    <div class="fold-body">
+      <p class="muted-note">Skills added here show as Self-reported. You do not need a résumé to complete your profile.</p>
+      <ul class="rows">{% for claim in claims %}<li class="row-item"><div class="row-main"><span class="row-title">{{ claim.skill.canonical_name }}</span>{% if claim.months %}<span class="row-sub">{{ claim.months }} months</span>{% endif %}</div><div class="row-end"><span class="badge badge-type">Self-reported</span></div></li>{% empty %}<li class="empty-state">No skills added yet.</li>{% endfor %}</ul>
+      <form method="post" action="{% url 'me-add-skill' %}" class="row g-2 mt-1">{% csrf_token %}
+        <div class="col-sm-6"><label class="form-label" for="s_skill">Skill</label><select class="form-select" id="s_skill" name="skill">{% for skill in skills %}<option>{{ skill.canonical_name }}</option>{% endfor %}</select></div>
+        <div class="col-sm-3"><label class="form-label" for="s_months">Months used</label><input class="form-control" id="s_months" type="number" min="0" max="1200" name="months"></div>
+        <div class="col-sm-3 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Add skill</button></div>
+      </form>
+    </div>
+  </details>
+  <details class="fold" id="resume" {% if uploads %}open{% endif %}>
+    <summary><span class="row-icon">{% icon "file" %}</span>Résumé{% icon "chevron" "chev" %}</summary>
+    <div class="fold-body">
+      <p id="notice"><strong>Before you upload:</strong> we use this file only to match you to project requirements in this organisation. Reviewers see what it contains. You can correct your profile or ask us to delete your data at any time.</p>
+      <form method="post" enctype="multipart/form-data" action="{% url 'me-upload' %}" class="row g-2">{% csrf_token %}
+        <div class="col-sm-9"><label class="form-label" for="r_file">PDF, up to 5 MB and 10 pages</label><input class="form-control" id="r_file" type="file" name="file" accept="application/pdf" required aria-describedby="notice"></div>
+        <div class="col-sm-3 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Upload</button></div>
+      </form>
+      <ul class="rows mt-2">{% for upload in uploads %}<li class="row-item"><span class="row-main"><span class="row-title">Version {{ upload.version }}: {% if upload.status == 'PENDING' %}Being checked{% elif upload.status == 'FAILED' %}Could not be processed{% else %}Processed{% endif %}</span>{% if upload.status == 'FAILED' %}<span class="row-sub">{{ upload.recovery_message }}</span>{% endif %}</span></li>{% empty %}<li class="empty-state">No résumé uploaded yet.</li>{% endfor %}</ul>
+    </div>
+  </details>
+  <details class="fold" id="data">
+    <summary><span class="row-icon">{% icon "shield" %}</span>Your data{% icon "chevron" "chev" %}</summary>
+    <div class="fold-body">
+      <form method="post" action="{% url 'me-data-request' %}" class="d-flex gap-2 flex-wrap">{% csrf_token %}
+        <button class="btn btn-outline-secondary" name="kind" value="CORRECTION" type="submit">Ask for a correction</button>
+        <button class="btn btn-outline-secondary" name="kind" value="DELETION" type="submit">Ask for deletion</button>
+      </form>
+    </div>
+  </details>
+  {% endif %}
+</section>
+</div>
+{% endblock %}

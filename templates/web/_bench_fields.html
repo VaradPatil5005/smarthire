@@ -1,0 +1,5 @@
+<div class="row g-3 mt-1">
+  <div class="col-md-4"><label class="form-label" for="f_type">Type</label><select class="form-select" id="f_type" name="resource_type">{% for value, label in type_choices %}<option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><label class="form-label" for="f_alloc">Allocation % (internal)</label><input class="form-control" id="f_alloc" type="number" min="0" max="100" name="allocation_pct" value="{% if form %}{{ form.allocation_pct }}{% else %}{{ profile.allocation_pct|default_if_none:'' }}{% endif %}">{% if errors.allocation_pct %}<div class="field-error">{{ errors.allocation_pct }}</div>{% endif %}</div>
+  <div class="col-md-4"><label class="form-label" for="f_free">Available from (internal)</label><input class="form-control" id="f_free" type="date" name="available_from" value="{% if form %}{{ form.available_from }}{% else %}{{ profile.available_from|date:'Y-m-d' }}{% endif %}">{% if errors.available_from %}<div class="field-error">{{ errors.available_from }}</div>{% endif %}</div>
+</div>

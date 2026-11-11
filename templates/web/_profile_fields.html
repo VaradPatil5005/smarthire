@@ -1,0 +1,7 @@
+<div class="row g-3">
+  <div class="col-md-6"><label class="form-label" for="f_name">Name</label><input class="form-control" id="f_name" name="display_name" value="{% if form %}{{ form.display_name }}{% else %}{{ profile.display_name|default:'' }}{% endif %}" required>{% if errors.display_name %}<div class="field-error">{{ errors.display_name }}</div>{% endif %}</div>
+  <div class="col-md-6"><label class="form-label" for="f_title">Title</label><input class="form-control" id="f_title" name="title" value="{% if form %}{{ form.title }}{% else %}{{ profile.title|default:'' }}{% endif %}">{% if errors.title %}<div class="field-error">{{ errors.title }}</div>{% endif %}</div>
+  <div class="col-md-4"><label class="form-label" for="f_email">Email</label><input class="form-control" id="f_email" type="email" name="email" value="{% if form %}{{ form.email }}{% else %}{{ profile.email|default:'' }}{% endif %}"></div>
+  <div class="col-md-4"><label class="form-label" for="f_phone">Phone</label><input class="form-control" id="f_phone" name="phone" value="{% if form %}{{ form.phone }}{% else %}{{ profile.phone|default:'' }}{% endif %}"></div>
+  <div class="col-md-4"><label class="form-label" for="f_notice">Notice period (days)</label><input class="form-control" id="f_notice" type="number" min="0" name="notice_days" value="{% if form %}{{ form.notice_days }}{% else %}{{ profile.notice_days|default_if_none:'' }}{% endif %}">{% if errors.notice_days %}<div class="field-error">{{ errors.notice_days }}</div>{% endif %}</div>
+</div>

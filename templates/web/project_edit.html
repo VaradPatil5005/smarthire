@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ project.name }}{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'project-detail' project.pk %}">Back to the project</a>
+<h1>Edit project</h1>
+<p class="hero-sub">Changes apply to future runs. Past runs keep the dates they ran with.</p>
+{% endblock %}
+{% block content %}
+<section class="panel narrow">
+  <form method="post" class="row g-3">{% csrf_token %}
+    <div class="col-12"><label class="form-label" for="p_name">Name</label><input class="form-control" id="p_name" name="name" value="{{ project.name }}" required></div>
+    <div class="col-md-6"><label class="form-label" for="p_start">Start date</label><input class="form-control" id="p_start" type="date" name="start_date" value="{{ project.start_date|date:'Y-m-d' }}"></div>
+    <div class="col-md-6"><label class="form-label" for="p_alloc">Required allocation %</label><input class="form-control" id="p_alloc" type="number" min="1" max="100" name="required_allocation_pct" value="{{ project.required_allocation_pct }}"></div>
+    <div class="col-12"><label class="form-label" for="p_desc">Description</label><textarea class="form-control" id="p_desc" name="description" rows="3">{{ project.description }}</textarea></div>
+    <div class="col-12 d-flex gap-2 flex-wrap"><button class="btn btn-primary" type="submit">Save changes</button><a class="btn btn-outline-secondary" href="{% url 'project-detail' project.pk %}">Cancel</a></div>
+  </form>
+</section>
+{% endblock %}

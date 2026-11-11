@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load l10n ui %}
+{% block title %}{{ profile.display_name }}{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'profile-list' %}">All profiles</a>
+<div class="hero-row">
+  <div><h1>{{ profile.display_name }}</h1><p class="hero-sub">{{ profile.title }} · <span class="badge badge-type">{{ profile.get_resource_type_display }}</span>{% if profile.allocation_pct is not None %} · {{ profile.allocation_pct }}% allocated{% endif %}{% if profile.available_from %} · free {{ profile.available_from|date:"j M Y" }}{% endif %}{% if profile.notice_days is not None %} · {{ profile.notice_days }} days notice{% endif %}</p></div>
+  <div class="hero-actions"><a class="btn btn-light-pill" href="{% url 'profile-edit' profile.pk %}">{% icon "edit" %}Edit profile</a></div>
+</div>
+{% endblock %}
+{% block content %}
+{% if open_requests %}
+<a class="ink-card" href="{% url 'data-requests' %}"><span class="ink-card-icon">{% icon "inbox" %}</span><span>This person has an open data request<small>See the queue and mark it handled</small></span>{% icon "chevron" %}</a>
+{% endif %}
+<section class="panel" id="evidence" aria-labelledby="ev-h"><h2 class="panel-title" id="ev-h">Evidence to review</h2>
+  <p class="muted-note">Only text judged visible is listed, with the line as it appears on the page. Check the two agree. Nothing counts until a reviewer accepts it.</p>
+  <div class="table-wrap"><table class="table align-middle table-stack"><caption class="visually-hidden">Proposed evidence</caption>
+    <thead><tr><th scope="col">Skill</th><th scope="col">Passage</th><th scope="col">Section</th><th scope="col">State</th><th scope="col">Decision</th></tr></thead>
+    <tbody>{% for item in spans %}{% with span=item.span crop=item.crop %}<tr>
+      <td data-label="Skill"><strong>{{ span.skill.canonical_name }}</strong></td>
+      <td data-label="Passage"><div><span class="passage">{{ span.quote }}</span> <span class="muted-note">p.{{ span.page }}, v{{ span.resume_version.version }}{% if span.months %}, {{ span.months }} months{% endif %}</span>{% if span.ambiguous %} <span class="badge badge-provisional">Check wording</span>{% endif %}
+        {% if crop %}<svg class="crop d-block mt-1" viewBox="{{ crop.view_x|unlocalize }} {{ crop.view_y|unlocalize }} {{ crop.view_width|unlocalize }} {{ crop.view_height|unlocalize }}" role="img" aria-label="This line as it appears on the rendered page"><image href="{{ crop.url }}" width="{{ crop.page_width|unlocalize }}" height="{{ crop.page_height|unlocalize }}"></image></svg>{% endif %}</div></td>
+      <td data-label="Section">{{ span.get_section_display }}</td>
+      <td data-label="State">{% if span.state == 'PROVISIONAL' %}<span class="badge badge-provisional">Provisional</span>{% elif span.state == 'ACCEPTED' %}<span class="badge badge-ready">Accepted</span>{% else %}<span class="badge badge-type">{{ span.get_state_display }}</span>{% endif %}</td>
+      <td data-label="Decision">
+        {% if span.state == 'PROVISIONAL' or span.state == 'ACCEPTED' or span.state == 'EXCLUDED' %}
+        <form method="post" action="{% url 'profile-decide' profile.pk %}" class="d-flex gap-1 flex-wrap align-items-center">{% csrf_token %}
+          <input type="hidden" name="span_id" value="{{ span.pk }}">
+          <label class="visually-hidden" for="reason-{{ span.pk }}">Reason</label><input class="form-control form-control-sm w-auto" id="reason-{{ span.pk }}" name="reason" placeholder="Reason" required>
+          {% if span.state != 'ACCEPTED' %}<label class="visually-hidden" for="months-{{ span.pk }}">Months supported</label><input class="form-control form-control-sm months-input" id="months-{{ span.pk }}" name="months" type="number" min="0" max="1200" placeholder="Months">
+          <button class="btn btn-sm btn-primary" name="outcome" value="ACCEPT" type="submit">{% if span.state == 'EXCLUDED' %}Accept instead{% else %}Accept{% endif %}</button>{% endif %}
+          {% if span.state != 'EXCLUDED' %}<button class="btn btn-sm btn-outline-secondary" name="outcome" value="EXCLUDE" type="submit">{% if span.state == 'ACCEPTED' %}Exclude instead{% else %}Exclude{% endif %}</button>{% endif %}
+        </form>
+        {% else %}<span class="muted-note">This wording cannot be evidence.</span>{% endif %}
+      </td>
+    </tr>{% endwith %}{% empty %}<tr><td colspan="5" data-label="" class="empty-state">No passages proposed. Skills can still be added by form.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+<div class="row g-3">
+  <div class="col-lg-6">
+    <section class="panel" aria-labelledby="res-h"><h2 class="panel-title" id="res-h">Résumé versions</h2>
+      <ul class="rows">{% for version in resumes %}<li class="row-item"><span class="row-icon">{% icon "file" %}</span><div class="row-main"><span class="row-title">Version {{ version.version }}: {{ version.get_status_display }}</span>{% if version.recovery_message %}<span class="row-sub">{{ version.recovery_message }}</span>{% endif %}</div>
+        {% if version.is_servable %}<div class="row-end"><a href="{% url 'xray' version.pk %}">Open X-ray</a><a href="/api/resumes/{{ version.pk }}/download/">Download</a></div>{% endif %}</li>{% empty %}<li class="empty-state">No résumé uploaded.</li>{% endfor %}</ul>
+      <form method="post" enctype="multipart/form-data" action="{% url 'profile-upload' profile.pk %}" class="row g-2 mt-2">{% csrf_token %}
+        <div class="col-sm-8"><label class="form-label" for="r_file">Upload a PDF</label><input class="form-control" id="r_file" type="file" name="file" accept="application/pdf" required></div>
+        <div class="col-sm-4 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Upload</button></div>
+      </form>
+    </section>
+    <section class="panel" aria-labelledby="cl-h"><h2 class="panel-title" id="cl-h">Form claims</h2>
+      <ul class="rows">{% for claim in claims %}<li class="row-item"><div class="row-main"><span class="row-title">{{ claim.skill.canonical_name }}</span>{% if claim.months %}<span class="row-sub">{{ claim.months }} months</span>{% endif %}</div><div class="row-end">{% if claim.provenance == 'IMPORT' and not claim.confirmed %}<span class="badge badge-provisional">Provisional, imported</span>{% else %}<span class="badge badge-type">Self-reported</span>{% endif %}</div></li>{% empty %}<li class="empty-state">No form claims.</li>{% endfor %}</ul>
+    </section>
+  </div>
+  <div class="col-lg-6">
+    <section class="panel" aria-labelledby="dec-h"><h2 class="panel-title" id="dec-h">Record a decision without a passage</h2>
+      <form method="post" action="{% url 'profile-decide' profile.pk %}" class="row g-2">{% csrf_token %}
+        <div class="col-sm-6"><label class="form-label" for="d_skill">Skill</label><select class="form-select" id="d_skill" name="skill_id">{% for skill in skills %}<option value="{{ skill.pk }}">{{ skill.canonical_name }}</option>{% endfor %}</select></div>
+        <div class="col-sm-6"><label class="form-label" for="d_outcome">Outcome</label><select class="form-select" id="d_outcome" name="outcome"><option value="VERIFIED">Verified</option><option value="UNMET">Unmet must-have</option></select></div>
+        <div class="col-sm-4"><label class="form-label" for="d_method">Method (for Verified)</label><select class="form-select" id="d_method" name="method"><option value="">None</option><option value="TEST">Test</option><option value="INTERVIEW">Interview</option></select></div>
+        <div class="col-sm-8"><label class="form-label" for="d_reason">Reason</label><input class="form-control" id="d_reason" name="reason" required></div>
+        <div class="col-12"><button class="btn btn-outline-primary" type="submit">Save decision</button></div>
+      </form>
+    </section>
+    <section class="panel" aria-labelledby="his-h"><h2 class="panel-title" id="his-h">Decision history</h2>
+      <ul class="rows history">{% for decision in decisions %}<li class="row-item"><div class="row-main"><span class="row-title">{{ decision.get_outcome_display }}{% if decision.skill %}: {{ decision.skill.canonical_name }}{% endif %}</span><span class="row-sub">{{ decision.reason }}</span><span class="row-sub">{{ decision.actor.username|default:"Removed user" }} · {{ decision.created_at|date:"j M Y H:i" }}{% if decision.method %} · {{ decision.get_method_display }}{% endif %}</span></div></li>{% empty %}<li class="empty-state">No decisions recorded yet.</li>{% endfor %}</ul>
+    </section>
+  </div>
+</div>
+{% endblock %}

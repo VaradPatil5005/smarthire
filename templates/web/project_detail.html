@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}{{ project.name }}{% endblock %}
+{% block hero %}
+<a class="crumb" href="{% url 'project-list' %}">All projects</a>
+<div class="hero-row">
+  <div>
+    <h1>{{ project.name }}</h1>
+    <p class="hero-sub">{% if project.description %}{{ project.description }} · {% endif %}Starts {{ project.start_date|date:"j M Y"|default:"on a date not set" }} · needs {{ project.required_allocation_pct }}% allocation · <span class="badge badge-type">{{ project.get_status_display }}</span></p>
+  </div>
+  {% if not project.is_closed %}
+  <div class="hero-actions">
+    {% if rubric and not rubric.is_approved %}{% if can_approve %}<form method="post" action="{% url 'project-approve' project.pk %}">{% csrf_token %}<button class="btn btn-light-pill" type="submit">{% icon "lock" %}Approve and lock v{{ rubric.version }}</button></form>{% endif %}{% endif %}
+    <form method="post" action="{% url 'project-run' project.pk %}">{% csrf_token %}<input type="hidden" name="key" value="{{ run_key }}"><button class="btn {% if rubric.is_approved %}btn-light-pill{% else %}btn-ghost{% endif %}" type="submit">{% icon "play" %}Run matching</button></form>
+    <a class="btn btn-ghost" href="{% url 'project-edit' project.pk %}">{% icon "edit" %}Edit</a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block content %}
+<section class="panel" aria-labelledby="rub-h"><h2 class="panel-title" id="rub-h">Rubric{% if rubric %} v{{ rubric.version }} <span class="badge {% if rubric.is_approved %}badge-ready{% else %}badge-provisional{% endif %}">{{ rubric.get_status_display }}</span>{% endif %}</h2>
+  {% if rubric and not rubric.is_approved and not can_approve %}<p class="muted-note">A delivery manager or admin approves rubrics.</p>{% endif %}
+  <div class="table-wrap"><table class="table align-middle table-stack"><caption class="visually-hidden">Rubric skills</caption><thead><tr><th scope="col">Skill</th><th scope="col">Importance</th><th scope="col">Weight</th><th scope="col">Required months</th>{% if rubric and not rubric.is_approved and not project.is_closed %}<th scope="col">Change</th>{% endif %}</tr></thead>
+  <tbody>
+  {% if rubric %}{% for item in rubric.skills.all %}
+    {% if rubric.is_approved or project.is_closed %}
+    <tr><td data-label="Skill"><strong>{{ item.skill.canonical_name }}</strong></td><td data-label="Importance">{{ item.get_importance_display }}</td><td data-label="Weight">{{ item.weight }}</td><td data-label="Required months">{{ item.required_months }}</td></tr>
+    {% else %}
+    <tr>
+      <td data-label="Skill"><strong>{{ item.skill.canonical_name }}</strong></td>
+      <td data-label="Importance"><label class="visually-hidden" for="imp-{{ item.pk }}">Importance of {{ item.skill.canonical_name }}</label><select class="form-select form-control-sm w-auto" id="imp-{{ item.pk }}" name="importance" form="edit-{{ item.pk }}">{% for value, label in importance_choices %}<option value="{{ value }}" {% if item.importance == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+      <td data-label="Weight"><label class="visually-hidden" for="wei-{{ item.pk }}">Weight of {{ item.skill.canonical_name }}</label><input class="form-control form-control-sm w-auto" id="wei-{{ item.pk }}" name="weight" type="number" min="1" value="{{ item.weight }}" form="edit-{{ item.pk }}"></td>
+      <td data-label="Required months"><label class="visually-hidden" for="mon-{{ item.pk }}">Required months for {{ item.skill.canonical_name }}</label><input class="form-control form-control-sm w-auto" id="mon-{{ item.pk }}" name="required_months" type="number" min="0" value="{{ item.required_months }}" form="edit-{{ item.pk }}"></td>
+      <td data-label="Change" class="text-nowrap">
+        <form method="post" id="edit-{{ item.pk }}" action="{% url 'project-skill-edit' project.pk item.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-primary btn-sm" type="submit">Save</button></form>
+        <form method="post" action="{% url 'project-skill-remove' project.pk item.pk %}" class="d-inline">{% csrf_token %}<button class="btn btn-outline-danger btn-sm" type="submit" aria-label="Remove {{ item.skill.canonical_name }}">Remove</button></form>
+      </td>
+    </tr>
+    {% endif %}
+  {% empty %}<tr><td colspan="5" data-label="" class="empty-state">No skills yet. A rubric needs at least one before approval.</td></tr>{% endfor %}
+  {% else %}<tr><td colspan="4" data-label="" class="empty-state">No rubric yet. Add a skill to start one.</td></tr>{% endif %}
+  </tbody></table></div>
+  {% if not project.is_closed %}
+  {% if rubric.is_approved %}<p class="muted-note mt-3 mb-1">{% icon "lock" %} Approved versions are locked. Adding a skill starts the next version.</p>{% endif %}
+  <form method="post" action="{% url 'project-add-skill' project.pk %}" class="row g-2 mt-1">{% csrf_token %}
+    <div class="col-md-4"><label class="form-label" for="a_skill">Add a skill</label><select class="form-select" id="a_skill" name="skill">{% for skill in skills %}<option>{{ skill.canonical_name }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label" for="a_imp">Importance</label><select class="form-select" id="a_imp" name="importance">{% for value, label in importance_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></div>
+    <div class="col-md-2"><label class="form-label" for="a_weight">Weight</label><input class="form-control" id="a_weight" type="number" min="1" name="weight" value="1" required></div>
+    <div class="col-md-2"><label class="form-label" for="a_months">Required months</label><input class="form-control" id="a_months" type="number" min="0" name="required_months" value="0"></div>
+    <div class="col-md-2 d-flex align-items-end"><button class="btn btn-outline-primary w-100" type="submit">Add skill</button></div>
+  </form>
+  {% else %}<p class="muted-note mt-3 mb-0">This project is closed. Its runs and exports stay readable.</p>{% endif %}
+</section>
+<section class="panel" aria-labelledby="runs-h"><h2 class="panel-title" id="runs-h">Run history</h2>
+  <ul class="rows">{% for run in runs %}<li class="row-item"><span class="row-icon">{% icon "play" %}</span><div class="row-main"><a class="row-title" href="{% url 'shortlist' run.pk %}">{{ run.created_at|date:"j M Y H:i:s" }}</a><span class="row-sub">Rubric v{{ run.rubric_version.version }} · dictionary v{{ run.dictionary_version.number }} · algorithm {{ run.algorithm_version }}</span></div><div class="row-end">{% icon "chevron" %}</div></li>{% empty %}<li class="empty-state">No runs yet. Approve a rubric, then run matching.</li>{% endfor %}</ul>
+</section>
+{% if not project.is_closed %}
+<form method="post" action="{% url 'project-close' project.pk %}" data-confirm="Close this project? It cannot be reopened from the screen." class="text-center">{% csrf_token %}<button class="btn btn-outline-secondary btn-sm" type="submit">Close project</button></form>
+{% endif %}
+{% endblock %}

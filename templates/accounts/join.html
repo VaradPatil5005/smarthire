@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Join · SmartHireAI{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block shell %}
+<div class="auth-shell">
+  <div class="auth-side">
+    <span class="wordmark">SMARTHIRE</span>
+    <p>Your organisation sent you an invitation code.</p>
+    <ul class="auth-points">
+      <li>{% icon "check" %}<span>Add your skills by form. A résumé is optional.</span></li>
+      <li>{% icon "file" %}<span>You can correct your details or ask for deletion at any time.</span></li>
+    </ul>
+  </div>
+  <svg class="auth-curve auth-curve-top" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0H400V4C290 110 120 90 0 28Z"/></svg>
+  <svg class="auth-curve-side" viewBox="0 0 80 400" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0H70C10 120 10 280 70 400H0Z"/></svg>
+  <main id="main" class="auth-main" tabindex="-1">
+    <div class="auth-form">
+      <h1>Join</h1>
+      {% if error %}<div class="alert alert-danger" role="alert">{{ error }}</div>{% endif %}
+      <form method="post">{% csrf_token %}
+        <div class="mb-3"><label class="form-label" for="id_token">Invitation code</label><input class="form-control" id="id_token" name="token" value="{{ token }}" autocomplete="off" required></div>
+        <div class="mb-3"><label class="form-label" for="id_username">Username</label><input class="form-control" id="id_username" name="username" autocomplete="username" required>{% for e in form.username.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</div>
+        <div class="mb-3"><label class="form-label" for="id_password1">Password</label><input class="form-control" id="id_password1" type="password" name="password1" autocomplete="new-password" required>{% for e in form.password1.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</div>
+        <div class="mb-3"><label class="form-label" for="id_password2">Confirm password</label><input class="form-control" id="id_password2" type="password" name="password2" autocomplete="new-password" required>{% for e in form.password2.errors %}<div class="field-error">{{ e }}</div>{% endfor %}</div>
+        <button class="btn btn-primary" type="submit">Join</button>
+      </form>
+      <p class="auth-foot">Already joined? <a href="{% url 'login' %}">Log in</a></p>
+    </div>
+  </main>
+</div>
+{% endblock %}

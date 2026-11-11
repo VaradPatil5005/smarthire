@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Log in · SmartHireAI{% endblock %}
+{% block body_class %}auth-body{% endblock %}
+{% block shell %}
+<div class="auth-shell">
+  <div class="auth-side">
+    <span class="wordmark">SMARTHIRE</span>
+    <p>Welcome back. Log in to continue.</p>
+    <ul class="auth-points">
+      <li>{% icon "check" %}<span>Every score shows the skill, the weight and the passage behind it.</span></li>
+      <li>{% icon "shield" %}<span>Hidden résumé text is shown to reviewers and carries no weight.</span></li>
+      <li>{% icon "profiles" %}<span>Bench consultants and applicants, matched against one project rubric.</span></li>
+    </ul>
+  </div>
+  <svg class="auth-curve auth-curve-top" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0H400V4C290 110 120 90 0 28Z"/></svg>
+  <svg class="auth-curve-side" viewBox="0 0 80 400" preserveAspectRatio="none" aria-hidden="true"><path d="M0 0H70C10 120 10 280 70 400H0Z"/></svg>
+  <main id="main" class="auth-main" tabindex="-1">
+    <div class="auth-form">
+      <h1>Login</h1>
+      <form method="post">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger" role="alert">{{ form.non_field_errors.0 }}</div>{% endif %}
+        <div class="mb-3"><label class="form-label" for="id_username">Username</label><input class="form-control" id="id_username" name="username" placeholder="Enter your username" autocomplete="username" required></div>
+        <div class="mb-3"><label class="form-label" for="id_password">Password</label>
+          <div class="field-wrap"><input class="form-control" id="id_password" type="password" name="password" autocomplete="current-password" required>
+            <button class="field-toggle" type="button" data-toggle-password="id_password" aria-label="Show characters" aria-pressed="false">{% icon "eye-off" %}</button></div></div>
+        <button class="btn btn-primary" type="submit">Log in</button>
+      </form>
+      <p class="auth-foot">New here? <a href="{% url 'join' %}">Join with an invitation</a></p>
+    </div>
+  </main>
+</div>
+{% endblock %}
